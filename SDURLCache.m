@@ -545,8 +545,10 @@ static dispatch_queue_t get_disk_io_queue() {
 #pragma mark NSObject
 
 - (void)dealloc {
-    dispatch_source_cancel(_maintenanceTimer);
-    dispatch_release(_maintenanceTimer);
+    if(_maintenanceTimer) {
+        dispatch_source_cancel(_maintenanceTimer);
+        dispatch_release(_maintenanceTimer);
+    }
     [_diskCachePath release], _diskCachePath = nil;
     [_diskCacheInfo release], _diskCacheInfo = nil;
     [super dealloc];
