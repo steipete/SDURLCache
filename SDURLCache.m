@@ -45,6 +45,10 @@ static NSDateFormatter* CreateDateFormatter(NSString *format) {
 
 @implementation NSCachedURLResponse(NSCoder)
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wobjc-protocol-method-implementation"
+// This is an intentional override of the default behavior. Silence the warning.
+
 - (void)encodeWithCoder:(NSCoder *)coder {
     [coder encodeDataObject:self.data];
     [coder encodeObject:self.response forKey:@"response"];
@@ -58,6 +62,8 @@ static NSDateFormatter* CreateDateFormatter(NSString *format) {
                          userInfo:[coder decodeObjectForKey:@"userInfo"]
                     storagePolicy:[coder decodeIntForKey:@"storagePolicy"]];
 }
+
+#pragma clang diagnostic pop
 
 @end
 
