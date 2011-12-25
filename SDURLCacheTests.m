@@ -37,6 +37,7 @@
 - (void)testExpirationDateFromHeader
 {
     NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
+    [dateFormatter setTimeZone:[NSTimeZone timeZoneWithAbbreviation:@"GMT"]];
     [dateFormatter setDateFormat:@"EEE, dd MMM yyyy HH:mm:ss z"];
     NSDate *now = [NSDate date];
     NSString *pastDate = [dateFormatter stringFromDate:[NSDate dateWithTimeInterval:-1000 sinceDate:now]];
