@@ -29,7 +29,6 @@
 
 static NSTimeInterval const kAFURLCacheInfoDefaultMinCacheInterval = 5.0 * 60.0; // 5 minute
 static NSString *const kAFURLCacheInfoFileName = @"cacheInfo.plist";
-static NSString *const kAFURLCacheInfoDiskUsageKey = @"diskUsage";
 static NSString *const kAFURLCacheInfoAccessesKey = @"accesses";
 static NSString *const kAFURLCacheInfoSizesKey = @"sizes";
 static float const kAFURLCacheLastModFraction = 0.1f; // 10% since Last-Modified suggested by RFC2616 section 13.2.4
@@ -486,13 +485,13 @@ static dispatch_queue_t get_disk_io_queue() {
                 _diskCacheInfo = [[NSMutableDictionary alloc] initWithContentsOfFile:[_diskCachePath stringByAppendingPathComponent:kAFURLCacheInfoFileName]];
                 if (!_diskCacheInfo) {
                     _diskCacheInfo = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
-                                      [NSNumber numberWithUnsignedInt:0], kAFURLCacheInfoDiskUsageKey,
                                       [NSMutableDictionary dictionary], kAFURLCacheInfoAccessesKey,
                                       [NSMutableDictionary dictionary], kAFURLCacheInfoSizesKey,
                                       nil];
                 }
                 _diskCacheInfoDirty = NO;
-                _diskCacheUsage = [[_diskCacheInfo objectForKey:kAFURLCacheInfoDiskUsageKey] unsignedIntValue];
+                NSArray *sizes = [[_diskCacheInfo objectForKey:kAFURLCacheInfoSizesKey] allValues];
+                _diskCacheUsage = [[sizes valueForKeyPath:@"@sum.self"] unsignedIntegerValue];
                 
                 // create maintenance timer
                 [self maintenanceTimer];
@@ -520,6 +519,8 @@ static dispatch_queue_t get_disk_io_queue() {
 - (void)saveCacheInfo {
     [self createDiskCachePath];
     dispatch_async_afreentrant(get_disk_cache_queue(), ^{
+        // Previous versions of SDURLCache stored a diskUsage key that could go wrong, just get rid of it.
+        [self.diskCacheInfo removeObjectForKey:@"diskUsage"];
         NSData *data = [NSPropertyListSerialization dataFromPropertyList:self.diskCacheInfo format:NSPropertyListBinaryFormat_v1_0 errorDescription:NULL];
         if (data) {
             [data writeToFile:[_diskCachePath stringByAppendingPathComponent:kAFURLCacheInfoFileName] atomically:YES];
@@ -547,7 +548,6 @@ static dispatch_queue_t get_disk_io_queue() {
             [fileManager removeItemAtPath:[_diskCachePath stringByAppendingPathComponent:cacheKey] error:NULL];
             
             _diskCacheUsage -= cacheItemSize;
-            [self.diskCacheInfo setObject:[NSNumber numberWithUnsignedInteger:_diskCacheUsage] forKey:kAFURLCacheInfoDiskUsageKey];
         }
         
         [pool drain];
@@ -599,8 +599,9 @@ static dispatch_queue_t get_disk_io_queue() {
     [fileManager release];
     
     dispatch_async_afreentrant(get_disk_cache_queue(), ^{
+        NSNumber *previousCacheItemSize = [[self.diskCacheInfo objectForKey:kAFURLCacheInfoSizesKey] objectForKey:cacheKey];
+        _diskCacheUsage -= [previousCacheItemSize unsignedIntegerValue];
         _diskCacheUsage += [cacheItemSize unsignedIntegerValue];
-        [self.diskCacheInfo setObject:[NSNumber numberWithUnsignedInteger:_diskCacheUsage] forKey:kAFURLCacheInfoDiskUsageKey];
         
         // Update cache info for the stored item
         [(NSMutableDictionary *)[self.diskCacheInfo objectForKey:kAFURLCacheInfoAccessesKey] setObject:[NSDate date] forKey:cacheKey];
