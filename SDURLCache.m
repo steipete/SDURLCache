@@ -743,6 +743,10 @@ static dispatch_queue_t get_disk_io_queue() {
     });
 }
 
+- (void)removeAllCachedResponsesInMemory {
+    [super removeAllCachedResponses];
+}
+
 - (BOOL)isCached:(NSURL *)url {
     NSURLRequest *request = [NSURLRequest requestWithURL:url];
     request = [SDURLCache canonicalRequestForRequest:request];

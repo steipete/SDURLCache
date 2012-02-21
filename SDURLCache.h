@@ -52,4 +52,10 @@
  */
 - (BOOL)isCached:(NSURL *)url;
 
+/*
+ * Clears the receiver’s in-memory cache, removing all stored cached URL responses there.
+ * Has no effect on the on-disk cache.
+ */
+- (void)removeAllCachedResponsesInMemory;
+
 @end
