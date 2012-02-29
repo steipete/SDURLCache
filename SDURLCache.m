@@ -271,12 +271,9 @@ static NSDate *_parseHTTPDate(const char *buf, size_t bufLen) {
 
 @implementation NSCachedURLResponse(NSCoder)
 
-// supported by Xcode 4.3 and above
+// This is an intentional override of the default behavior. Silence the warning. (supported by Xcode 4.3 and above)
 #pragma clang diagnostic push
-#if __clang_minor__ >= 1
 #pragma clang diagnostic ignored "-Wobjc-protocol-method-implementation"
-#endif
-// This is an intentional override of the default behavior. Silence the warning.
 
 - (void)encodeWithCoder:(NSCoder *)coder {
     [coder encodeDataObject:self.data];
