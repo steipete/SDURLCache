@@ -700,12 +700,23 @@ static dispatch_queue_t get_disk_io_queue() {
     dispatch_sync(get_disk_cache_queue(), ^{
         NSMutableDictionary *accesses = [self.diskCacheInfo objectForKey:kAFURLCacheInfoAccessesKey];
         if ([accesses objectForKey:cacheKey]) { // OPTI: Check for cache-hit in a in-memory dictionnary before to hit the FS
-            response = [NSKeyedUnarchiver unarchiveObjectWithFile:[_diskCachePath stringByAppendingPathComponent:cacheKey]];
-            if (response) {
-                // OPTI: Log the entry last access time for LRU cache eviction algorithm but don't save the dictionary
-                //       on disk now in order to save IO and time
-                [accesses setObject:[NSDate date] forKey:cacheKey];
-                _diskCacheInfoDirty = YES;
+            @try {
+                response = [NSKeyedUnarchiver unarchiveObjectWithFile:[_diskCachePath stringByAppendingPathComponent:cacheKey]];
+                if (response) {
+                    // OPTI: Log the entry last access time for LRU cache eviction algorithm but don't save the dictionary
+                    //       on disk now in order to save IO and time
+                    [accesses setObject:[NSDate date] forKey:cacheKey];
+                    _diskCacheInfoDirty = YES;
+                }
+            }
+            @catch (NSException *exception) {
+                if ([exception.name isEqualToString:NSInvalidArgumentException]) {
+                    NSLog(@"Could not unarchive object at %@, Invalid archive!", [_diskCachePath stringByAppendingPathComponent:cacheKey]);
+                    [self removeCachedResponseForRequest:request];
+                }
+            }
+            @finally {
+                // do nothing
             }
         }
     });
