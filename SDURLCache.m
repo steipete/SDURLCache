@@ -652,9 +652,10 @@ static dispatch_queue_t get_disk_io_queue() {
 - (void)storeCachedResponse:(NSCachedURLResponse *)cachedResponse forRequest:(NSURLRequest *)request {
     request = [SDURLCache canonicalRequestForRequest:request];
     
-    if (request.cachePolicy == NSURLRequestReloadIgnoringLocalCacheData
-        || request.cachePolicy == NSURLRequestReloadIgnoringLocalAndRemoteCacheData
-        || request.cachePolicy == NSURLRequestReloadIgnoringCacheData) {
+    if (!_allowCachingResponsesToNonCachedRequests &&
+        (request.cachePolicy == NSURLRequestReloadIgnoringLocalCacheData
+         || request.cachePolicy == NSURLRequestReloadIgnoringLocalAndRemoteCacheData
+         || request.cachePolicy == NSURLRequestReloadIgnoringCacheData)) {
         // When cache is ignored for read, it's a good idea not to store the result as well as this option
         // have big chance to be used every times in the future for the same request.
         // NOTE: This is a change regarding default URLCache behavior
@@ -784,6 +785,7 @@ static dispatch_queue_t get_disk_io_queue() {
 
 @synthesize minCacheInterval = _minCacheInterval;
 @synthesize ignoreMemoryOnlyStoragePolicy = _ignoreMemoryOnlyStoragePolicy;
+@synthesize allowCachingResponsesToNonCachedRequests = _allowCachingResponsesToNonCachedRequests;
 @synthesize diskCachePath = _diskCachePath;
 @synthesize diskCacheInfo = _diskCacheInfo;
 

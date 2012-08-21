@@ -38,6 +38,16 @@
  */
 @property (nonatomic, assign) BOOL ignoreMemoryOnlyStoragePolicy;
 
+
+/*
+ * Allow caching responses for a request with a cache policy that ignores the local cache.
+ * Usually, these responses don't need to be cached, because a request that ignores the cache
+ * once is likely to do so every time it is used.
+ * 
+ * The default value is NO.
+ */
+@property (nonatomic, assign) BOOL allowCachingResponsesToNonCachedRequests;
+
 /*
  * Returns a default cache director path to be used at cache initialization. The generated path directory
  * will be located in the application's cache directory and thus won't be synced by iTunes.
