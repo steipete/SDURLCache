@@ -10,14 +10,18 @@
 
 #import <Foundation/Foundation.h>
 
-@interface SDURLCache : NSURLCache {
+/* Define SDURLCACHE_DEBUG=1 if you want to get some more info about the cached requests. */
+
+@interface SDURLCache : NSURLCache
+{
     @private
-    BOOL _diskCacheInfoDirty;
-    BOOL _ignoreMemoryOnlyStoragePolicy;
-    BOOL _timerPaused;
-    NSUInteger _diskCacheUsage;
-    NSTimeInterval _minCacheInterval;
-    dispatch_source_t _maintenanceTimer;
+        BOOL _diskCacheInfoDirty;
+        BOOL _ignoreMemoryOnlyStoragePolicy;
+        BOOL _timerPaused;
+        BOOL _shouldRespectCacheControlHeaders;
+        NSUInteger _diskCacheUsage;
+        NSTimeInterval _minCacheInterval;
+        dispatch_source_t _maintenanceTimer;
 }
 
 /*
@@ -38,7 +42,6 @@
  */
 @property (nonatomic, assign) BOOL ignoreMemoryOnlyStoragePolicy;
 
-
 /*
  * Allow caching responses for a request with a cache policy that ignores the local cache.
  * Usually, these responses don't need to be cached, because a request that ignores the cache
@@ -47,6 +50,13 @@
  * The default value is NO.
  */
 @property (nonatomic, assign) BOOL allowCachingResponsesToNonCachedRequests;
+
+/*
+ * If the server sends cache-control / pragma: no-cache headers, then the requests will not be cached.
+ *
+ * The default value is YES.
+ */
+@property (nonatomic, assign) BOOL shouldRespectCacheControlHeaders;
 
 /*
  * Returns a default cache director path to be used at cache initialization. The generated path directory
@@ -64,5 +74,17 @@
  * Has no effect on the on-disk cache.
  */
 - (void)removeAllCachedResponsesInMemory;
+
+@end
+
+#pragma mark - For subclasses only
+
+@interface SDURLCache (PrivateMethods)
+
+/*
+ * This is the perfect place to strip some query parameters in case you are sending
+ * OAuth information via query string instead of the Authorization request header.
+ */
++ (NSURLRequest *)canonicalRequestForRequest:(NSURLRequest *)request;
 
 @end
