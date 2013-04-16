@@ -511,8 +511,7 @@ static dispatch_queue_t get_disk_io_queue() {
 }
 
 - (void)createDiskCachePath {
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
+    @synchronized(self) {
         NSFileManager *fileManager = [[NSFileManager alloc] init];
         if (![fileManager fileExistsAtPath:_diskCachePath]) {
             [fileManager createDirectoryAtPath:_diskCachePath
@@ -520,7 +519,7 @@ static dispatch_queue_t get_disk_io_queue() {
                                     attributes:nil
                                          error:NULL];
         }
-    });
+    }
 }
 
 - (void)saveCacheInfo {
