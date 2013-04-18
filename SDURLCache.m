@@ -310,6 +310,7 @@ inline void dispatch_async_afreentrant(dispatch_queue_t queue, dispatch_block_t 
 }
 
 @interface SDURLCache ()
+@property (nonatomic) BOOL needsCreateDiskCache;
 @property (nonatomic, retain) NSString *diskCachePath;
 @property (nonatomic, retain) NSMutableDictionary *diskCacheInfo;
 - (void)periodicMaintenance;
@@ -511,7 +512,10 @@ static dispatch_queue_t get_disk_io_queue() {
 }
 
 - (void)createDiskCachePath {
-    @synchronized(self) {
+    // This method is reentrant.
+    // If several threads call it concurrently, it may indeed attempt to create
+    // _diskCachePath several times. That's fine: file System can handle that.
+    if (self.needsCreateDiskCache) {
         NSFileManager *fileManager = [[NSFileManager alloc] init];
         if (![fileManager fileExistsAtPath:_diskCachePath]) {
             [fileManager createDirectoryAtPath:_diskCachePath
@@ -519,6 +523,7 @@ static dispatch_queue_t get_disk_io_queue() {
                                     attributes:nil
                                          error:NULL];
         }
+        self.needsCreateDiskCache = NO;
     }
 }
 
@@ -657,6 +662,7 @@ static dispatch_queue_t get_disk_io_queue() {
         self.minCacheInterval = kAFURLCacheInfoDefaultMinCacheInterval;
         self.shouldRespectCacheControlHeaders = YES;
         self.diskCachePath = path;
+        self.needsCreateDiskCache = YES;
         self.ignoreMemoryOnlyStoragePolicy = NO;
 	}
     
