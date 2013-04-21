@@ -649,7 +649,7 @@ static dispatch_queue_t get_disk_io_queue() {
         self.minCacheInterval = kAFURLCacheInfoDefaultMinCacheInterval;
         self.shouldRespectCacheControlHeaders = YES;
         self.diskCachePath = path;
-        self.ignoreMemoryOnlyStoragePolicy = YES;
+        self.ignoreMemoryOnlyStoragePolicy = NO;
 	}
     
     return self;
