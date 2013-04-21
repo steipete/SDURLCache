@@ -298,17 +298,6 @@ static NSDate *_parseHTTPDate(const char *buf, size_t bufLen) {
 
 @end
 
-// deadlock-free variant of dispatch_sync
-void dispatch_sync_afreentrant(dispatch_queue_t queue, dispatch_block_t block);
-inline void dispatch_sync_afreentrant(dispatch_queue_t queue, dispatch_block_t block) {
-    dispatch_get_current_queue() == queue ? block() : dispatch_sync(queue, block);
-}
-
-void dispatch_async_afreentrant(dispatch_queue_t queue, dispatch_block_t block);
-inline void dispatch_async_afreentrant(dispatch_queue_t queue, dispatch_block_t block) {
-	dispatch_get_current_queue() == queue ? block() : dispatch_async(queue, block);
-}
-
 @interface SDURLCache ()
 @property (nonatomic, retain) NSString *diskCachePath;
 @property (nonatomic, retain) NSMutableDictionary *diskCacheInfo;
@@ -372,7 +361,7 @@ static dispatch_queue_t get_disk_io_queue() {
                 [blockSelf periodicMaintenance];
                 
                 // will abuse cache queue to lock timer
-                dispatch_async_afreentrant(get_disk_cache_queue(), ^{
+                dispatch_async(get_disk_cache_queue(), ^{
                     dispatch_suspend(_maintenanceTimer); // pause timer
                     _timerPaused = YES;
                 });            
@@ -485,7 +474,7 @@ static dispatch_queue_t get_disk_io_queue() {
 
 - (NSMutableDictionary *)diskCacheInfo {
     if (!_diskCacheInfo) {
-        dispatch_sync_afreentrant(get_disk_cache_queue(), ^{
+        dispatch_sync(get_disk_cache_queue(), ^{
             if (!_diskCacheInfo) { // Check again, maybe another thread created it while waiting for the mutex
                 _diskCacheInfo = [[NSMutableDictionary alloc] initWithContentsOfFile:[_diskCachePath stringByAppendingPathComponent:kAFURLCacheInfoFileName]];
                 if (!_diskCacheInfo) {
@@ -525,10 +514,12 @@ static dispatch_queue_t get_disk_io_queue() {
 
 - (void)saveCacheInfo {
     [self createDiskCachePath];
-    dispatch_async_afreentrant(get_disk_cache_queue(), ^{
+    dispatch_async(get_disk_cache_queue(), ^{
         // Previous versions of SDURLCache stored a diskUsage key that could go wrong, just get rid of it.
         [self.diskCacheInfo removeObjectForKey:@"diskUsage"];
-        NSData *data = [NSPropertyListSerialization dataFromPropertyList:self.diskCacheInfo format:NSPropertyListBinaryFormat_v1_0 errorDescription:NULL];
+        NSData *data = [NSPropertyListSerialization dataFromPropertyList:self.diskCacheInfo
+                                                                  format:NSPropertyListBinaryFormat_v1_0
+                                                        errorDescription:NULL];
         if (data) {
             [data writeToFile:[_diskCachePath stringByAppendingPathComponent:kAFURLCacheInfoFileName] atomically:YES];
         }
@@ -538,7 +529,7 @@ static dispatch_queue_t get_disk_io_queue() {
 }
 
 - (void)removeCachedResponseForCachedKeys:(NSArray *)cacheKeys {
-    dispatch_async_afreentrant(get_disk_cache_queue(), ^{
+    dispatch_async(get_disk_cache_queue(), ^{
         @autoreleasepool {
             NSEnumerator *enumerator = [cacheKeys objectEnumerator];
             NSString *cacheKey;
@@ -570,7 +561,7 @@ static dispatch_queue_t get_disk_io_queue() {
         return; // Already done
     }
     
-    dispatch_async_afreentrant(get_disk_cache_queue(), ^{
+    dispatch_async(get_disk_cache_queue(), ^{
         NSMutableArray *keysToRemove = [NSMutableArray array];
         
         // Apply LRU cache eviction algorithm while disk usage outreach capacity
@@ -608,7 +599,7 @@ static dispatch_queue_t get_disk_io_queue() {
     NSFileManager *fileManager = [[NSFileManager alloc] init];
     NSNumber *cacheItemSize = [[fileManager attributesOfItemAtPath:cacheFilePath error:NULL] objectForKey:NSFileSize];
     
-    dispatch_async_afreentrant(get_disk_cache_queue(), ^{
+    dispatch_async(get_disk_cache_queue(), ^{
         NSNumber *previousCacheItemSize = [[self.diskCacheInfo objectForKey:kAFURLCacheInfoSizesKey] objectForKey:cacheKey];
         _diskCacheUsage -= [previousCacheItemSize unsignedIntegerValue];
         _diskCacheUsage += [cacheItemSize unsignedIntegerValue];
@@ -717,7 +708,7 @@ static dispatch_queue_t get_disk_io_queue() {
     // NOTE: We don't handle expiration here as even staled cache data is necessary for NSURLConnection to handle cache revalidation.
     //       Staled cache data is also needed for cachePolicies which force the use of the cache.
     __block NSCachedURLResponse *response = nil;
-    dispatch_sync(get_disk_cache_queue(), ^{
+    dispatch_sync(dispatch_get_main_queue(), ^{
         NSMutableDictionary *accesses = [self.diskCacheInfo objectForKey:kAFURLCacheInfoAccessesKey];
         if ([accesses objectForKey:cacheKey]) { // OPTI: Check for cache-hit in a in-memory dictionnary before to hit the FS
             @try {
@@ -768,7 +759,7 @@ static dispatch_queue_t get_disk_io_queue() {
     [super removeAllCachedResponses];
     NSFileManager *fileManager = [[NSFileManager alloc] init];
     [fileManager removeItemAtPath:_diskCachePath error:NULL];
-    dispatch_async_afreentrant(get_disk_cache_queue(), ^{
+    dispatch_async(get_disk_cache_queue(), ^{
         self.diskCacheInfo = nil;
     });
 }
