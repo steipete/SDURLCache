@@ -518,10 +518,17 @@ static dispatch_queue_t get_disk_io_queue() {
     if (self.needsCreateDiskCache) {
         NSFileManager *fileManager = [[NSFileManager alloc] init];
         if (![fileManager fileExistsAtPath:_diskCachePath]) {
-            [fileManager createDirectoryAtPath:_diskCachePath
-                   withIntermediateDirectories:YES
-                                    attributes:nil
-                                         error:NULL];
+            NSError *error;
+            if (![fileManager createDirectoryAtPath:_diskCachePath withIntermediateDirectories:YES attributes:nil error:&error]) {
+                [NSException raise:NSInternalInconsistencyException format:@"Could not create directory at path %@: got error %@", _diskCachePath, error.localizedDescription];
+            }
+            
+            // How do I prevent files from being backed up to iCloud and iTunes?
+            // http://developer.apple.com/library/ios/#qa/qa1719/_index.html
+            // iOS 5.1+
+            if (![[NSURL fileURLWithPath:_diskCachePath] setResourceValue:@YES forKey:NSURLIsExcludedFromBackupKey error:&error]) {
+                [NSException raise:NSInternalInconsistencyException format:@"Could not exclude directory at path %@ from backup: got error %@", _diskCachePath, error.localizedDescription];
+            }
         }
         self.needsCreateDiskCache = NO;
     }
