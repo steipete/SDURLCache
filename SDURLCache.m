@@ -310,6 +310,7 @@ inline void dispatch_async_afreentrant(dispatch_queue_t queue, dispatch_block_t 
 }
 
 @interface SDURLCache ()
+@property (nonatomic) BOOL needsCreateDiskCache;
 @property (nonatomic, retain) NSString *diskCachePath;
 @property (nonatomic, retain) NSMutableDictionary *diskCacheInfo;
 - (void)periodicMaintenance;
@@ -511,16 +512,26 @@ static dispatch_queue_t get_disk_io_queue() {
 }
 
 - (void)createDiskCachePath {
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
+    // This method is reentrant.
+    // If several threads call it concurrently, it may indeed attempt to create
+    // _diskCachePath several times. That's fine: file System can handle that.
+    if (self.needsCreateDiskCache) {
         NSFileManager *fileManager = [[NSFileManager alloc] init];
         if (![fileManager fileExistsAtPath:_diskCachePath]) {
-            [fileManager createDirectoryAtPath:_diskCachePath
-                   withIntermediateDirectories:YES
-                                    attributes:nil
-                                         error:NULL];
+            NSError *error;
+            if (![fileManager createDirectoryAtPath:_diskCachePath withIntermediateDirectories:YES attributes:nil error:&error]) {
+                [NSException raise:NSInternalInconsistencyException format:@"Could not create directory at path %@: got error %@", _diskCachePath, error.localizedDescription];
+            }
+            
+            // How do I prevent files from being backed up to iCloud and iTunes?
+            // http://developer.apple.com/library/ios/#qa/qa1719/_index.html
+            // iOS 5.1+
+            if (![[NSURL fileURLWithPath:_diskCachePath] setResourceValue:@YES forKey:NSURLIsExcludedFromBackupKey error:&error]) {
+                [NSException raise:NSInternalInconsistencyException format:@"Could not exclude directory at path %@ from backup: got error %@", _diskCachePath, error.localizedDescription];
+            }
         }
-    });
+        self.needsCreateDiskCache = NO;
+    }
 }
 
 - (void)saveCacheInfo {
@@ -658,6 +669,7 @@ static dispatch_queue_t get_disk_io_queue() {
         self.minCacheInterval = kAFURLCacheInfoDefaultMinCacheInterval;
         self.shouldRespectCacheControlHeaders = YES;
         self.diskCachePath = path;
+        self.needsCreateDiskCache = YES;
         self.ignoreMemoryOnlyStoragePolicy = NO;
 	}
     
